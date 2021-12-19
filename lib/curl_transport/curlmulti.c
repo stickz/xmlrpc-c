@@ -118,42 +118,45 @@ curlMulti_destroy(curlMulti * const curlMultiP) {
 void
 curlMulti_perform(xmlrpc_env * const envP,
                   curlMulti *  const curlMultiP,
-                  bool *       const immediateWorkToDoP,
                   int *        const runningHandleCtP) {
 /*----------------------------------------------------------------------------
    Do whatever work is ready to be done under the control of multi
    manager 'curlMultiP'.  E.g. if HTTP response data has recently arrived
    from the network, process it as an HTTP response.
 
-   Iff this results in some work being finished from our point of view,
-   return *immediateWorkToDoP true.  (Caller can query the multi manager for
-   messages and find out what it is).
-
    Return as *runningHandleCtP the number of Curl easy handles under the
    multi manager's control that are still running -- yet to finish.
 -----------------------------------------------------------------------------*/
-    CURLMcode rc;
+	do
+	{		
+		CURLMcode rc;
+		int numfds;
+		
+		curlMultiP->lockP->acquire(curlMultiP->lockP);
+		
+		rc = curl_multi_perform(curlMultiP->curlMultiP, runningHandleCtP);
+		
+		curlMultiP->lockP->release(curlMultiP->lockP);
+		
+		if (rc == CURLM_OK) {
+			/* wait for activity, timeout or "nothing" */
+			rc = curl_multi_wait(multi_handle, NULL, 0, 3000, numfds);
+		}
 
-    curlMultiP->lockP->acquire(curlMultiP->lockP);
-
-    rc = curl_multi_perform(curlMultiP->curlMultiP, runningHandleCtP);
-
-    curlMultiP->lockP->release(curlMultiP->lockP);
-
-    if (rc == CURLM_CALL_MULTI_PERFORM) {
-        *immediateWorkToDoP = true;
-    } else {
-        *immediateWorkToDoP = false;
-
-        if (rc != CURLM_OK) {
-            const char * reason;
+		if (rc != CURLM_OK) {
+			const char * reason;
             interpretCurlMultiError(&reason, rc);
-            xmlrpc_faultf(envP, "Impossible failure of curl_multi_perform(): "
-                          "%s", reason);
+            xmlrpc_faultf(envP, "Failure of curl_multi_perform(): %s", reason);
             xmlrpc_strfree(reason);
-        }
-    }
-}        
+			break;
+		}
+		
+		// Wait 100ms after timeout or no file descriptors before trying again
+		if(!numfds) {
+			WAITMS(100);
+		}
+	} while (runningHandleCtP);
+}
 
 
 
