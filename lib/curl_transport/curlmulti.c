@@ -140,7 +140,7 @@ curlMulti_perform(xmlrpc_env * const envP,
 		
 		if (rc == CURLM_OK) {
 			/* wait for activity, timeout or "nothing" */
-			rc = curl_multi_wait(multi_handle, NULL, 0, 3000, numfds);
+			rc = curl_multi_wait(curlMultiP->curlMultiP, NULL, 0, 3000, numfds);
 		}
 
 		if (rc != CURLM_OK) {
