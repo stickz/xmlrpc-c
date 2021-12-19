@@ -17,7 +17,6 @@ curlMulti_destroy(curlMulti * const curlMultiP);
 void
 curlMulti_perform(xmlrpc_env * const envP,
                   curlMulti *  const curlMultiP,
-                  bool *       const immediateWorkToDoP,
                   int *        const runningHandlesP);
 
 void
